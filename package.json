@@ -1,0 +1,40 @@
+{
+  "name": "who-are-u",
+  "productName": "WhoAreU",
+  "version": "0.1.0",
+  "description": "Inspect running programs on Windows — source, size, install date.",
+  "main": "main.js",
+  "private": true,
+  "scripts": {
+    "postinstall": "node scripts/make-icon.js",
+    "start": "electron .",
+    "build": "electron-builder --win portable",
+    "build:dir": "electron-builder --dir"
+  },
+  "devDependencies": {
+    "electron": "^31.0.0",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "com.whoareu.app",
+    "productName": "WhoAreU",
+    "files": [
+      "main.js",
+      "preload.js",
+      "src/**/*",
+      "assets/**/*"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "portable",
+          "arch": ["x64"]
+        }
+      ],
+      "icon": "assets/tray-icon.png"
+    },
+    "portable": {
+      "artifactName": "WhoAreU-${version}-portable.exe"
+    }
+  }
+}
