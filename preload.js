@@ -1,5 +1,8 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('whoAreU', {
-  list: () => ipcRenderer.invoke('system:list'),
+  list: (opts) => ipcRenderer.invoke('system:list', opts || {}),
+  onVisibility: (cb) => {
+    ipcRenderer.on('whoAreU:visible', (_e, visible) => cb(!!visible));
+  },
 });

@@ -1,22 +1,29 @@
-// PowerShell runner — spawns powershell.exe, passes the script via -EncodedCommand
-// (avoids all quoting/escaping headaches), captures stdout, parses JSON.
-// Used by processes.js and installed.js.
+// Spawns powershell.exe with -File pointing at a shipped .ps1 script.
+// (Avoids -EncodedCommand, which Korean AV products like V3 / 알약 treat as
+// a strong indicator of Living-off-the-Land abuse.)
 
 const { spawn } = require('child_process');
+const path = require('path');
 
-function runPowerShellJson(script, { timeoutMs = 15000 } = {}) {
-  // Force UTF-8 stdout — on Korean Windows the default is CP949 and ConvertTo-Json
-  // would emit registry strings in that encoding, which Node then mis-decodes as UTF-8.
-  const wrapped =
-    "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8\n" +
-    script;
-  const encoded = Buffer.from(wrapped, 'utf16le').toString('base64');
+// In production, this module sits inside app.asar but PowerShell can't read
+// from inside the archive. electron-builder unpacks .ps1 files (via
+// build.asarUnpack) to a sibling app.asar.unpacked tree — swap the prefix.
+function resolveScriptPath(name) {
+  const ASAR_SEG = `${path.sep}app.asar${path.sep}`;
+  const UNPACKED_SEG = `${path.sep}app.asar.unpacked${path.sep}`;
+  const base = __dirname.includes(ASAR_SEG)
+    ? __dirname.replace(ASAR_SEG, UNPACKED_SEG)
+    : __dirname;
+  return path.join(base, name);
+}
+
+function runPowerShellFile(scriptPath, { timeoutMs = 15000 } = {}) {
   return new Promise((resolve, reject) => {
     const proc = spawn('powershell.exe', [
       '-NoProfile',
       '-NonInteractive',
       '-ExecutionPolicy', 'Bypass',
-      '-EncodedCommand', encoded,
+      '-File', scriptPath,
     ], { windowsHide: true });
 
     let stdout = '';
@@ -50,4 +57,4 @@ function runPowerShellJson(script, { timeoutMs = 15000 } = {}) {
   });
 }
 
-module.exports = { runPowerShellJson };
+module.exports = { runPowerShellFile, resolveScriptPath };

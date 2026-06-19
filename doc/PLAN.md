@@ -78,10 +78,12 @@ whoAreU/
 ├── preload.js                 # contextBridge로 IPC 안전 노출
 ├── src/
 │   ├── system/
-│   │   ├── _ps.js             # PowerShell -EncodedCommand 호출 헬퍼 (공용)
+│   │   ├── _ps.js             # PowerShell -File 호출 헬퍼 (asar.unpacked 경로 해석)
 │   │   ├── processes.js       # 실행 중 프로세스 수집
-│   │   ├── installed.js       # 레지스트리 설치 정보 수집
-│   │   └── index.js           # 매칭/필터링 파사드
+│   │   ├── processes.ps1      # ↑ 동봉 스크립트 (asarUnpack)
+│   │   ├── installed.js       # 레지스트리 설치 정보 수집 + 60s 캐싱
+│   │   ├── installed.ps1      # ↑ 동봉 스크립트 (asarUnpack)
+│   │   └── index.js           # 매칭/필터링 파사드, force 옵션 전달
 │   └── renderer/
 │       ├── index.html
 │       ├── styles.css
@@ -146,7 +148,8 @@ type Process = {
 7. [x] `main.js` + `preload.js` (Tray, BrowserWindow, IPC)
 8. [x] `src/renderer/*` (대시보드 UI)
 9. [ ] `yarn start` 동작 검증
-10. [ ] `yarn build` portable exe 빌드 검증
+10. [x] `yarn build` portable exe 빌드 검증 (67.8 MB, 메타데이터·`.ps1` 언팩 확인)
+11. [x] 백신 휴리스틱 회피 — `-EncodedCommand` 제거(`.ps1` 동봉), 설치 정보 60s 캐싱, EXE 메타데이터·`publisherName`
 
 ---
 

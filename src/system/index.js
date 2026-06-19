@@ -50,10 +50,10 @@ function findApp(exePath, index) {
   return null;
 }
 
-async function listProcesses() {
+async function listProcesses({ force = false } = {}) {
   const [procs, apps] = await Promise.all([
     listRunningProcesses(),
-    listInstalledPrograms(),
+    listInstalledPrograms({ force }),
   ]);
   const index = buildIndex(apps);
   return procs.map((p) => {

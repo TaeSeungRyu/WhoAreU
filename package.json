@@ -2,7 +2,11 @@
   "name": "who-are-u",
   "productName": "WhoAreU",
   "version": "0.1.0",
-  "description": "Inspect running programs on Windows — source, size, install date.",
+  "description": "내 PC에서 실행 중인 프로그램의 출처·설치일·용량을 확인하는 트레이 앱",
+  "author": {
+    "name": "WhoAreU"
+  },
+  "license": "UNLICENSED",
   "main": "main.js",
   "private": true,
   "scripts": {
@@ -18,11 +22,15 @@
   "build": {
     "appId": "com.whoareu.app",
     "productName": "WhoAreU",
+    "copyright": "Copyright © 2026 WhoAreU",
     "files": [
       "main.js",
       "preload.js",
       "src/**/*",
       "assets/**/*"
+    ],
+    "asarUnpack": [
+      "src/system/*.ps1"
     ],
     "win": {
       "target": [
@@ -31,7 +39,9 @@
           "arch": ["x64"]
         }
       ],
-      "icon": "assets/tray-icon.png"
+      "icon": "assets/icon.png",
+      "publisherName": "WhoAreU",
+      "verifyUpdateCodeSignature": false
     },
     "portable": {
       "artifactName": "WhoAreU-${version}-portable.exe"

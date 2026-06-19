@@ -1,22 +1,9 @@
 // Lists user-app processes currently running.
 // Excludes Windows system processes by path prefix and a known-names whitelist.
 
-const { runPowerShellJson } = require('./_ps');
+const { runPowerShellFile, resolveScriptPath } = require('./_ps');
 
-const PS_SCRIPT = `
-$ErrorActionPreference = 'SilentlyContinue'
-Get-Process |
-  Where-Object { $_.Path } |
-  ForEach-Object {
-    [PSCustomObject]@{
-      pid         = $_.Id
-      name        = $_.ProcessName
-      exePath     = $_.Path
-      memoryBytes = [int64]$_.WorkingSet64
-    }
-  } |
-  ConvertTo-Json -Compress
-`;
+const SCRIPT_PATH = resolveScriptPath('processes.ps1');
 
 const WINDOWS_DIR_RE = /^[A-Z]:\\Windows\\/i;
 
@@ -44,7 +31,7 @@ function isSystemProcess(p) {
 }
 
 async function listRunningProcesses() {
-  const raw = await runPowerShellJson(PS_SCRIPT);
+  const raw = await runPowerShellFile(SCRIPT_PATH);
   return raw
     .filter((p) => p && p.pid != null)
     .filter((p) => !isSystemProcess(p))

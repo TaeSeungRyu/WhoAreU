@@ -4,7 +4,8 @@ const state = {
   sortKey: 'totalMemoryBytes',
   sortDir: 'desc',
   expanded: new Set(),      // group keys whose details are open
-  autoRefreshMs: 5000,
+  autoRefreshMs: 10000,
+  windowVisible: true,
   loading: false,
   error: null,
   lastRefreshAt: null,
@@ -220,13 +221,13 @@ function render() {
   renderSortDir();
 }
 
-async function refresh() {
+async function refresh({ force = false } = {}) {
   if (state.loading) return;
   state.loading = true;
   $('refresh').disabled = true;
   renderStatus(null);
   try {
-    state.rows = await window.whoAreU.list();
+    state.rows = await window.whoAreU.list({ force });
     state.error = null;
     state.lastRefreshAt = Date.now();
   } catch (err) {
@@ -243,7 +244,16 @@ function setAutoRefresh(on) {
     clearInterval(autoTimer);
     autoTimer = null;
   }
-  if (on) autoTimer = setInterval(refresh, state.autoRefreshMs);
+  // Only actually run the timer when the user wants it AND the window is shown.
+  // While hidden, the renderer stays completely quiet — no PowerShell spawns.
+  if (on && state.windowVisible) autoTimer = setInterval(refresh, state.autoRefreshMs);
+}
+
+if (window.whoAreU && window.whoAreU.onVisibility) {
+  window.whoAreU.onVisibility((visible) => {
+    state.windowVisible = visible;
+    setAutoRefresh($('autoRefresh').checked);
+  });
 }
 
 // --- wiring ---
@@ -253,7 +263,7 @@ $('search').addEventListener('input', (e) => {
   render();
 });
 
-$('refresh').addEventListener('click', refresh);
+$('refresh').addEventListener('click', () => refresh({ force: true }));
 
 $('autoRefresh').addEventListener('change', (e) => {
   setAutoRefresh(e.target.checked);
