@@ -78,6 +78,7 @@ whoAreU/
 ├── preload.js                 # contextBridge로 IPC 안전 노출
 ├── src/
 │   ├── system/
+│   │   ├── _ps.js             # PowerShell -EncodedCommand 호출 헬퍼 (공용)
 │   │   ├── processes.js       # 실행 중 프로세스 수집
 │   │   ├── installed.js       # 레지스트리 설치 정보 수집
 │   │   └── index.js           # 매칭/필터링 파사드
@@ -136,16 +137,16 @@ type Process = {
 
 ## 6. 작업 단계
 
-- [x] 1차 계획 합의 (이 문서)
-- [ ] `package.json` / `.gitignore` (electron, electron-builder, yarn 스크립트, portable 빌드 설정)
-- [ ] `scripts/make-icon.js` (postinstall에서 트레이 아이콘 placeholder 생성)
-- [ ] `src/system/processes.js` (Get-Process 호출)
-- [ ] `src/system/installed.js` (레지스트리 Uninstall 키 조회)
-- [ ] `src/system/index.js` (매칭/필터링 파사드)
-- [ ] `main.js` + `preload.js` (Tray, BrowserWindow, IPC)
-- [ ] `src/renderer/*` (대시보드 UI)
-- [ ] `yarn start` 동작 검증
-- [ ] `yarn build` portable exe 빌드 검증
+1. [x] 1차 계획 합의 (이 문서)
+2. [x] `package.json` / `.gitignore` (electron, electron-builder, yarn 스크립트, portable 빌드 설정)
+3. [x] `scripts/make-icon.js` (postinstall에서 트레이 아이콘 placeholder 생성)
+4. [x] `src/system/processes.js` (Get-Process 호출)
+5. [x] `src/system/installed.js` (레지스트리 Uninstall 키 조회)
+6. [ ] `src/system/index.js` (매칭/필터링 파사드)
+7. [ ] `main.js` + `preload.js` (Tray, BrowserWindow, IPC)
+8. [ ] `src/renderer/*` (대시보드 UI)
+9. [ ] `yarn start` 동작 검증
+10. [ ] `yarn build` portable exe 빌드 검증
 
 ---
 
