@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'" />
+    <title>WhoAreU</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="toolbar">
+      <h1>WhoAreU</h1>
+      <input id="search" type="search" placeholder="이름 · 게시자 · 경로 검색" autocomplete="off" />
+      <button id="refresh" type="button">새로고침</button>
+      <label class="toggle">
+        <input id="autoRefresh" type="checkbox" checked />
+        <span>자동 새로고침</span>
+      </label>
+      <span id="status" class="status"></span>
+    </header>
+    <main>
+      <table id="table">
+        <thead>
+          <tr>
+            <th data-key="name">이름</th>
+            <th data-key="publisher">게시자</th>
+            <th data-key="exePath">경로</th>
+            <th data-key="diskBytes" class="num">디스크</th>
+            <th data-key="memoryBytes" class="num">메모리</th>
+            <th data-key="installDate">설치일</th>
+            <th data-key="pid" class="num">PID</th>
+          </tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+      </table>
+      <div id="empty" class="placeholder hidden">표시할 프로세스가 없습니다.</div>
+      <div id="error" class="placeholder error hidden"></div>
+    </main>
+    <script src="app.js"></script>
+  </body>
+</html>

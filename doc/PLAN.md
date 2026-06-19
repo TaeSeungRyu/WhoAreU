@@ -142,9 +142,9 @@ type Process = {
 3. [x] `scripts/make-icon.js` (postinstall에서 트레이 아이콘 placeholder 생성)
 4. [x] `src/system/processes.js` (Get-Process 호출)
 5. [x] `src/system/installed.js` (레지스트리 Uninstall 키 조회)
-6. [ ] `src/system/index.js` (매칭/필터링 파사드)
-7. [ ] `main.js` + `preload.js` (Tray, BrowserWindow, IPC)
-8. [ ] `src/renderer/*` (대시보드 UI)
+6. [x] `src/system/index.js` (매칭/필터링 파사드)
+7. [x] `main.js` + `preload.js` (Tray, BrowserWindow, IPC)
+8. [x] `src/renderer/*` (대시보드 UI)
 9. [ ] `yarn start` 동작 검증
 10. [ ] `yarn build` portable exe 빌드 검증
 
@@ -160,3 +160,4 @@ type Process = {
 - 프로세스 컨텍스트 메뉴 — 종료, 설치 폴더 열기, 게시자 페이지 열기
 - Windows 시작 시 자동 트레이 상주
 - 다국어 (현재 한국어 기준 작성)
+- MSIX/Store 앱 매칭 (`Get-AppxPackage`) — 1차 매칭률 ~75%인데 미매칭의 다수가 `WindowsApps\…` MSIX 앱
