@@ -1,16 +1,26 @@
 const state = {
-  rows: [],
+  rows: [],                 // flat processes from IPC
   filter: '',
-  sortKey: 'memoryBytes',
+  sortKey: 'totalMemoryBytes',
   sortDir: 'desc',
+  expanded: new Set(),      // group keys whose details are open
   autoRefreshMs: 5000,
   loading: false,
   error: null,
   lastRefreshAt: null,
 };
 
-let autoTimer = null;
+// Sensible default direction per sort key.
+const SORT_DEFAULTS = {
+  totalMemoryBytes: 'desc',
+  diskBytes: 'desc',
+  processCount: 'desc',
+  installDate: 'desc',
+  name: 'asc',
+  publisher: 'asc',
+};
 
+let autoTimer = null;
 const $ = (id) => document.getElementById(id);
 
 function formatBytes(n) {
@@ -30,9 +40,40 @@ function escapeHtml(s) {
     .replace(/"/g, '&quot;');
 }
 
+// Group processes by app. Matched apps use displayName+publisher as identity;
+// unmatched use processName+exePath so two unrelated installs of the same
+// binary (e.g. claude.exe in MSIX vs VS Code extension) stay separate.
+function groupByApp(rows) {
+  const map = new Map();
+  for (const r of rows) {
+    const key = r.publisher
+      ? r.name + '|' + r.publisher
+      : '__nopub__|' + r.name + '|' + (r.exePath || '');
+    let g = map.get(key);
+    if (!g) {
+      g = {
+        key,
+        name: r.name,
+        publisher: r.publisher,
+        installDate: r.installDate,
+        diskBytes: r.diskBytes,
+        exePath: r.exePath,
+        processCount: 0,
+        totalMemoryBytes: 0,
+        processes: [],
+      };
+      map.set(key, g);
+    }
+    g.processCount += 1;
+    g.totalMemoryBytes += r.memoryBytes || 0;
+    g.processes.push({ pid: r.pid, memoryBytes: r.memoryBytes, exePath: r.exePath });
+  }
+  return Array.from(map.values());
+}
+
 function compareValues(a, b, dir) {
   if (a == null && b == null) return 0;
-  if (a == null) return 1; // nulls always last
+  if (a == null) return 1;   // nulls always last regardless of direction
   if (b == null) return -1;
   if (typeof a === 'number' && typeof b === 'number') {
     return dir === 'asc' ? a - b : b - a;
@@ -41,49 +82,93 @@ function compareValues(a, b, dir) {
   return dir === 'asc' ? cmp : -cmp;
 }
 
-function applyFilterAndSort() {
-  const q = state.filter.trim().toLowerCase();
-  const list = q
-    ? state.rows.filter((r) =>
-        (r.name || '').toLowerCase().includes(q) ||
-        (r.publisher || '').toLowerCase().includes(q) ||
-        (r.exePath || '').toLowerCase().includes(q))
-    : state.rows.slice();
-  list.sort((a, b) => compareValues(a[state.sortKey], b[state.sortKey], state.sortDir));
-  return list;
-}
-
-function muted(v) {
-  return v ? escapeHtml(v) : '<span class="muted">—</span>';
-}
-
-function rowHtml(r) {
-  const disk = r.diskBytes != null ? formatBytes(r.diskBytes) : null;
-  const mem = formatBytes(r.memoryBytes);
+function filterGroup(g, q) {
+  if (!q) return true;
   return (
-    '<tr>' +
-    '<td title="' + escapeHtml(r.name) + '">' + escapeHtml(r.name) + '</td>' +
-    '<td title="' + escapeHtml(r.publisher || '') + '">' + muted(r.publisher) + '</td>' +
-    '<td title="' + escapeHtml(r.exePath || '') + '">' + muted(r.exePath) + '</td>' +
-    '<td class="num">' + muted(disk) + '</td>' +
-    '<td class="num">' + escapeHtml(mem) + '</td>' +
-    '<td>' + muted(r.installDate) + '</td>' +
-    '<td class="num">' + r.pid + '</td>' +
-    '</tr>'
+    (g.name || '').toLowerCase().includes(q) ||
+    (g.publisher || '').toLowerCase().includes(q) ||
+    (g.exePath || '').toLowerCase().includes(q)
   );
 }
 
-function renderHeaderSort() {
-  document.querySelectorAll('th').forEach((th) => {
-    th.classList.remove('sorted', 'asc');
-    if (th.dataset.key === state.sortKey) {
-      th.classList.add('sorted');
-      if (state.sortDir === 'asc') th.classList.add('asc');
-    }
-  });
+function applyView() {
+  const groups = groupByApp(state.rows);
+  const q = state.filter.trim().toLowerCase();
+  const filtered = q ? groups.filter((g) => filterGroup(g, q)) : groups;
+  filtered.sort((a, b) => compareValues(a[state.sortKey], b[state.sortKey], state.sortDir));
+  return { groups, filtered };
 }
 
-function renderStatus() {
+function processListHtml(g) {
+  // Sort PIDs by memory desc inside the expanded panel.
+  const procs = g.processes.slice().sort((a, b) => (b.memoryBytes || 0) - (a.memoryBytes || 0));
+  const items = procs
+    .map(
+      (p) =>
+        '<li><span class="pid">#' +
+        p.pid +
+        '</span><span>' +
+        escapeHtml(formatBytes(p.memoryBytes) || '—') +
+        '</span></li>'
+    )
+    .join('');
+  const path = g.exePath
+    ? '<div class="path">' + escapeHtml(g.exePath) + '</div>'
+    : '';
+  return path + '<ul>' + items + '</ul>';
+}
+
+function cardHtml(g) {
+  const expanded = state.expanded.has(g.key);
+  const isUnverified = !g.publisher;
+  const pubHtml = g.publisher
+    ? '<span class="pub">' + escapeHtml(g.publisher) + '</span>'
+    : '<span class="pub unknown">출처 미확인</span>';
+
+  const meta = [pubHtml];
+  if (g.installDate) {
+    meta.push('<span class="sep">·</span>');
+    meta.push('<span>설치 ' + escapeHtml(g.installDate) + '</span>');
+  }
+  if (g.diskBytes != null) {
+    meta.push('<span class="sep">·</span>');
+    meta.push('<span>디스크 <span class="num">' + escapeHtml(formatBytes(g.diskBytes)) + '</span></span>');
+  }
+
+  const childrenHtml = expanded
+    ? '<div class="card-children">' + processListHtml(g) + '</div>'
+    : '';
+
+  return (
+    '<div class="card' +
+    (isUnverified ? ' unverified' : '') +
+    (expanded ? ' expanded' : '') +
+    '" data-key="' +
+    escapeHtml(g.key) +
+    '">' +
+    '<div class="card-header">' +
+    '<span class="card-name" title="' +
+    escapeHtml(g.name) +
+    '">' +
+    escapeHtml(g.name) +
+    '</span>' +
+    '<span class="card-badge">' +
+    g.processCount +
+    ' 프로세스</span>' +
+    '<span class="card-chevron">▾</span>' +
+    '</div>' +
+    '<div class="card-meta">' +
+    meta.join('') +
+    '</div>' +
+    '<div class="card-stat"><span class="label">메모리 합계</span>' +
+    escapeHtml(formatBytes(g.totalMemoryBytes)) +
+    '</div>' +
+    childrenHtml +
+    '</div>'
+  );
+}
+
+function renderStatus(view) {
   if (state.loading) {
     $('status').textContent = '로딩 중…';
     return;
@@ -93,11 +178,23 @@ function renderStatus() {
     return;
   }
   const ago = Math.max(0, Math.round((Date.now() - state.lastRefreshAt) / 1000));
-  $('status').textContent = state.rows.length + '개 · 마지막 갱신 ' + ago + '초 전';
+  const procCount = state.rows.length;
+  const appCount = view ? view.groups.length : 0;
+  const shown = view ? view.filtered.length : appCount;
+  const counts =
+    shown === appCount
+      ? appCount + '개 앱 · ' + procCount + '개 프로세스'
+      : shown + ' / ' + appCount + '개 앱 · ' + procCount + '개 프로세스';
+  $('status').textContent = counts + ' · 마지막 갱신 ' + ago + '초 전';
+}
+
+function renderSortDir() {
+  $('sortDir').textContent = state.sortDir === 'asc' ? '▲' : '▼';
+  $('sortDir').title = state.sortDir === 'asc' ? '오름차순 (클릭: 내림차순)' : '내림차순 (클릭: 오름차순)';
 }
 
 function render() {
-  const tbody = $('tbody');
+  const cards = $('cards');
   const errorBox = $('error');
   const emptyBox = $('empty');
 
@@ -105,31 +202,29 @@ function render() {
     errorBox.textContent = '오류: ' + state.error;
     errorBox.classList.remove('hidden');
     emptyBox.classList.add('hidden');
-    tbody.innerHTML = '';
-    renderHeaderSort();
-    renderStatus();
+    cards.innerHTML = '';
+    renderStatus(null);
     return;
   }
   errorBox.classList.add('hidden');
 
-  const list = applyFilterAndSort();
-  if (list.length === 0) {
-    tbody.innerHTML = '';
+  const view = applyView();
+  if (view.filtered.length === 0) {
+    cards.innerHTML = '';
     emptyBox.classList.remove('hidden');
   } else {
     emptyBox.classList.add('hidden');
-    tbody.innerHTML = list.map(rowHtml).join('');
+    cards.innerHTML = view.filtered.map(cardHtml).join('');
   }
-
-  renderHeaderSort();
-  renderStatus();
+  renderStatus(view);
+  renderSortDir();
 }
 
 async function refresh() {
   if (state.loading) return;
   state.loading = true;
   $('refresh').disabled = true;
-  renderStatus();
+  renderStatus(null);
   try {
     state.rows = await window.whoAreU.list();
     state.error = null;
@@ -151,7 +246,8 @@ function setAutoRefresh(on) {
   if (on) autoTimer = setInterval(refresh, state.autoRefreshMs);
 }
 
-// Wire UI
+// --- wiring ---
+
 $('search').addEventListener('input', (e) => {
   state.filter = e.target.value;
   render();
@@ -163,22 +259,33 @@ $('autoRefresh').addEventListener('change', (e) => {
   setAutoRefresh(e.target.checked);
 });
 
-document.querySelectorAll('th').forEach((th) => {
-  th.addEventListener('click', () => {
-    const key = th.dataset.key;
-    if (!key) return;
-    if (state.sortKey === key) {
-      state.sortDir = state.sortDir === 'asc' ? 'desc' : 'asc';
-    } else {
-      state.sortKey = key;
-      state.sortDir = key === 'name' || key === 'publisher' || key === 'installDate' ? 'asc' : 'desc';
-    }
-    render();
-  });
+$('sortKey').addEventListener('change', (e) => {
+  state.sortKey = e.target.value;
+  state.sortDir = SORT_DEFAULTS[state.sortKey] || 'desc';
+  render();
 });
 
-// Status "ago" ticker — keeps the relative time fresh between refreshes.
-setInterval(renderStatus, 1000);
+$('sortDir').addEventListener('click', () => {
+  state.sortDir = state.sortDir === 'asc' ? 'desc' : 'asc';
+  render();
+});
+
+// Event delegation for card expand/collapse.
+$('cards').addEventListener('click', (e) => {
+  const header = e.target.closest('.card-header');
+  if (!header) return;
+  const card = header.closest('.card');
+  if (!card) return;
+  const key = card.dataset.key;
+  if (state.expanded.has(key)) state.expanded.delete(key);
+  else state.expanded.add(key);
+  render();
+});
+
+// Status "ago" ticker — only refresh the status line, not the whole tree.
+setInterval(() => {
+  if (!state.loading && state.lastRefreshAt) renderStatus(applyView());
+}, 1000);
 
 // Boot
 refresh();

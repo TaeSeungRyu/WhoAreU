@@ -5,7 +5,12 @@
 const { spawn } = require('child_process');
 
 function runPowerShellJson(script, { timeoutMs = 15000 } = {}) {
-  const encoded = Buffer.from(script, 'utf16le').toString('base64');
+  // Force UTF-8 stdout — on Korean Windows the default is CP949 and ConvertTo-Json
+  // would emit registry strings in that encoding, which Node then mis-decodes as UTF-8.
+  const wrapped =
+    "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8\n" +
+    script;
+  const encoded = Buffer.from(wrapped, 'utf16le').toString('base64');
   return new Promise((resolve, reject) => {
     const proc = spawn('powershell.exe', [
       '-NoProfile',
